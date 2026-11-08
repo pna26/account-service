@@ -1,0 +1,93 @@
+# Account no EKS: só é acessível pelo auth e pelo gateway (ClusterIP), como no compose.
+# O CI troca a imagem ":latest" pela tag do commit antes do kubectl apply.
+#
+# O Secret com usuário e senha do banco NÃO fica no Git. Crie uma vez por cluster:
+#   kubectl create secret generic account-secrets -n store \
+#     --from-literal=DATABASE_USERNAME=<usuario> \
+#     --from-literal=DATABASE_PASSWORD=<senha>
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: account-configmap
+data:
+  # no EKS: endpoint do RDS PostgreSQL
+  DATABASE_HOST: postgres
+  DATABASE_PORT: "5432"
+  DATABASE_DB: store
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account
+  labels:
+    app: account
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: account
+  template:
+    metadata:
+      labels:
+        app: account
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: account
+          image: 637423273088.dkr.ecr.us-east-2.amazonaws.com/account-service:latest
+          # o CI sempre aplica uma tag nova (sha-xxxxxxx), então não precisa de Always
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: account-configmap
+            - secretRef:
+                name: account-secrets
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ "ALL" ]
+          volumeMounts:
+            # o Tomcat precisa de um /tmp gravável
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: account
+spec:
+  type: ClusterIP
+  selector:
+    app: account
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
