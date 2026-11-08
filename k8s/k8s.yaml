@@ -10,8 +10,8 @@ kind: ConfigMap
 metadata:
   name: account-configmap
 data:
-  # no EKS: endpoint do RDS PostgreSQL
-  DATABASE_HOST: postgres
+  # endpoint do RDS PostgreSQL (rds-store). Para testar no Docker Desktop: postgres
+  DATABASE_HOST: rds-store.cb046mq0wslp.us-east-2.rds.amazonaws.com
   DATABASE_PORT: "5432"
   DATABASE_DB: store
 ---
