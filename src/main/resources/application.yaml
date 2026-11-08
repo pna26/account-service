@@ -16,3 +16,19 @@ spring:
     properties:
       hibernate:
         default_schema: accounts
+
+  # mensageria (Hands-on 7): o OutboxRelay publica com ack de todas as réplicas
+  # e produtor idempotente (sem duplicar no reenvio)
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        linger.ms: 5
+        max.block.ms: 5000     # Kafka fora: a rodada do relay falha em 5 s (padrão 60 s) e tenta de novo
+
+store:
+  account:
+    topic: account-events
+    relay-interval-ms: 200
