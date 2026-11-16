@@ -48,6 +48,8 @@ public class AccountService {
         }
 
         account.hashPassword(calcHash(pass));
+        // RBAC: toda conta nova é USER; o papel nunca vem da requisição
+        account.role(Role.USER.name());
 
         final Account saved = accountRepository.save(
             new AccountModel(account)
